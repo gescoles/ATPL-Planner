@@ -371,12 +371,15 @@
 
   function capacityFor(dateStr) { return dateStr >= "2026-09-01" ? 200 : 300; }
 
-  function todayStr() {
-    var d = new Date();
+  function toLocalISODate(d) {
     var y = d.getFullYear();
     var m = String(d.getMonth() + 1).padStart(2, "0");
     var day = String(d.getDate()).padStart(2, "0");
     return y + "-" + m + "-" + day;
+  }
+
+  function todayStr() {
+    return toLocalISODate(new Date());
   }
 
   function daysBetween(fromStr, toStr) {
@@ -390,7 +393,7 @@
     var d = new Date(startStr + "T00:00:00");
     var end = new Date(endStr + "T00:00:00");
     while (d <= end) {
-      out.push(d.toISOString().slice(0, 10));
+      out.push(toLocalISODate(d));
       d.setDate(d.getDate() + 1);
     }
     return out;
