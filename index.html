@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ATPL — Plan de vuelo</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0A0E17;
+    --panel: #121826;
+    --panel2: #161E2E;
+    --header: #0E1420;
+    --border: #242E44;
+    --border-soft: #1B2436;
+    --text: #EAEFF9;
+    --muted: #7C88A4;
+    --muted-dim: #4A5573;
+    --amber: #F5A623;
+    --amber-soft: #3A2D15;
+    --green: #3FBF7F;
+    --green-soft: #123324;
+    --red: #EF5350;
+    --red-soft: #3A1B1C;
+    --blue: #5B9BD5;
+    --blue-soft: #132A3D;
+    --weekend-tint: #0D1220;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { padding: 24px 16px; }
+
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: var(--amber);
+  }
+
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 24px;
+    margin: 4px 0 0;
+  }
+
+  .top-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .right-controls { display: flex; align-items: center; gap: 12px; }
+
+  .save-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .save-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); display: inline-block; flex-shrink: 0; }
+
+  .gear-btn {
+    background: var(--panel);
+    border: 1px solid var(--border-soft);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .gear-btn:hover { color: var(--text); border-color: var(--border); }
+
+  .config-panel {
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 14px 0;
+    max-width: 640px;
+  }
+  .config-panel.open { display: block; }
+  .config-panel h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    margin: 0 0 10px;
+  }
+  .config-panel p {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin: 0 0 10px;
+  }
+  .config-panel code {
+    background: var(--panel2);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+  }
+  .config-field { margin-bottom: 10px; }
+  .config-field label {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    letter-spacing: 0.04em;
+  }
+  .config-field input {
+    width: 100%;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 5px;
+    padding: 8px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+  }
+  .config-field input:focus { outline: 2px solid var(--amber); outline-offset: -1px; }
+  .config-actions { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  .btn-primary {
+    background: var(--amber);
+    color: var(--bg);
+    border: none;
+    border-radius: 5px;
+    padding: 8px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 8px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .config-status { font-family: 'IBM Plex Mono', monospace; font-size: 11px; margin-left: 4px; }
+
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 12px;
+    margin: 20px 0;
+    max-width: 520px;
+  }
+  .summary-cell {
+    background: var(--panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .summary-label {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .summary-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .legend {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+  .table-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+  }
+
+  .grid {
+    display: grid;
+    width: max-content;
+  }
+
+  .corner {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: var(--header);
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+  }
+
+  .head-cell {
+    background: var(--header);
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border-soft);
+    text-align: center;
+    padding: 5px 0 6px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .head-cell.weekend { background: var(--weekend-tint); }
+  .head-month { font-size: 9px; color: var(--muted-dim); height: 11px; }
+  .head-day { font-size: 12px; color: var(--text); font-weight: 600; }
+  .head-weekday { font-size: 8px; color: var(--muted-dim); }
+
+  .subject-cell {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border-soft);
+    border-right: 1px solid var(--border);
+    padding: 8px 10px;
+  }
+  .subject-code { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; color: var(--amber); }
+  .subject-name { font-size: 10px; color: var(--muted); margin-top: 1px; line-height: 1.2; }
+
+  .cell {
+    background: var(--panel2);
+    border-bottom: 1px solid var(--border-soft);
+    border-right: 1px solid var(--border-soft);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 0;
+  }
+  .cell.behind { background: var(--red-soft); }
+  .cell.ontrack { background: var(--green-soft); }
+  .cell.ahead { background: var(--blue-soft); }
+  .cell.done { background: var(--green-soft); color: var(--green); font-size: 13px; }
+
+  .cell-target { font-size: 8px; color: var(--muted-dim); font-family: 'IBM Plex Mono', monospace; height: 10px; }
+  .cell-input {
+    width: 34px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .cell-input:focus { outline: 2px solid var(--amber); outline-offset: -2px; }
+  .cell-input::placeholder { color: var(--muted-dim); }
+  .cell-input::-webkit-outer-spin-button, .cell-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .cell-input[type=number] { -moz-appearance: textfield; }
+  .cell.behind .cell-input { color: var(--red); }
+  .cell.ontrack .cell-input { color: var(--green); }
+  .cell.ahead .cell-input { color: var(--blue); }
+
+  .footer-note {
+    margin-top: 16px;
+    font-size: 11px;
+    color: var(--muted-dim);
+    font-family: 'IBM Plex Mono', monospace;
+    max-width: 720px;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top-row">
+      <div>
+        <div class="eyebrow">ATPL — PLAN DE VUELO</div>
+        <h1>Cuadro de preguntas por día</h1>
+      </div>
+      <div class="right-controls">
+        <div class="save-indicator" id="saveIndicator">
+          <span class="save-dot" id="saveDot"></span>
+          <span id="saveText">cargando…</span>
+        </div>
+        <button class="gear-btn" id="gearBtn" type="button">⚙ Supabase</button>
+      </div>
+    </div>
+
+    <div class="config-panel" id="configPanel">
+      <h2>Conectar con Supabase</h2>
+      <p>
+        1. Crea un proyecto en <code>supabase.com</code> (o usa uno que ya tengas).<br />
+        2. En el <code>SQL Editor</code> pega y ejecuta el script <code>supabase-schema.sql</code> que te he dado aparte.<br />
+        3. Ve a <code>Project Settings → API</code> y copia la <code>Project URL</code> y la clave <code>anon public</code> aquí abajo.
+      </p>
+      <div class="config-field">
+        <label>PROJECT URL</label>
+        <input type="text" id="cfgUrl" placeholder="https://xxxxxxxx.supabase.co" />
+      </div>
+      <div class="config-field">
+        <label>ANON PUBLIC KEY</label>
+        <input type="text" id="cfgKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+      </div>
+      <div class="config-actions">
+        <button class="btn-primary" id="cfgSave" type="button">Guardar y sincronizar</button>
+        <button class="btn-secondary" id="cfgClear" type="button">Desconectar</button>
+        <span class="config-status" id="cfgStatus"></span>
+      </div>
+    </div>
+
+    <div class="summary" id="summary"></div>
+
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>cumplido</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--red)"></span>por debajo</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span>por encima</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--muted-dim)"></span>sin registrar</span>
+    </div>
+
+    <div class="table-scroll">
+      <div class="grid" id="tableGrid"></div>
+    </div>
+
+    <div class="footer-note">
+      cada día haces 300Q (hasta el 31/8) o 200Q (desde el 1/9) enteras en UNA asignatura a la vez, por este orden: Meteo → POF → FPL → Air Law → Performance.
+      en cuanto terminas una, la siguiente empieza a recibir la capacidad del día. lo que no cumplas hoy se suma a los días siguientes de esa misma asignatura.<br /><br />
+      se guarda siempre en este navegador (localStorage), y si conectas Supabase (⚙ arriba), además se sincroniza en la nube — así lo tienes accesible desde cualquier dispositivo y a salvo aunque borres el navegador.
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var SUBJECTS = [
+    { id: "met", code: "MET", name: "Meteorology", examDate: "2026-10-19", total: 3000 },
+    { id: "pof", code: "POF", name: "Principles of Flight", examDate: "2026-10-23", total: 2900 },
+    { id: "fpl", code: "FPL", name: "Flight Planning", examDate: "2026-10-26", total: 1700 },
+    { id: "law", code: "LAW", name: "Air Law", examDate: "2026-10-28", total: 2000 },
+    { id: "per", code: "PER", name: "Performance", examDate: "2026-10-30", total: 1600 }
+  ];
+  var LAST_DATE = "2026-10-19";
+  var STORAGE_KEY = "atpl-planner-logs-v1";
+  var CONFIG_KEY = "atpl-supabase-config";
+  var TABLE = "atpl_planner_logs";
+  var WEEKDAY_ES = ["D", "L", "M", "X", "J", "V", "S"];
+
+  function capacityFor(dateStr) { return dateStr >= "2026-09-01" ? 200 : 300; }
+
+  function todayStr() {
+    var d = new Date();
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
+
+  function daysBetween(fromStr, toStr) {
+    var a = new Date(fromStr + "T00:00:00");
+    var b = new Date(toStr + "T00:00:00");
+    return Math.round((b - a) / 86400000);
+  }
+
+  function dateRange(startStr, endStr) {
+    var out = [];
+    var d = new Date(startStr + "T00:00:00");
+    var end = new Date(endStr + "T00:00:00");
+    while (d <= end) {
+      out.push(d.toISOString().slice(0, 10));
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }
+
+  var TODAY = todayStr();
+  var DATES = dateRange(TODAY, LAST_DATE);
+
+  function loadLocalLogs() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+  function saveLocalLogs(logs) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(logs)); return true; }
+    catch (e) { return false; }
+  }
+  function loadSupabaseConfig() {
+    try {
+      var raw = localStorage.getItem(CONFIG_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function saveSupabaseConfig(cfg) {
+    try { localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg)); return true; }
+    catch (e) { return false; }
+  }
+  function clearSupabaseConfig() {
+    try { localStorage.removeItem(CONFIG_KEY); } catch (e) {}
+  }
+
+  var logs = loadLocalLogs();
+  var sbClient = null;
+  var sbConfig = loadSupabaseConfig();
+
+  function initSupabaseClient() {
+    if (sbConfig && sbConfig.url && sbConfig.key && window.supabase) {
+      try {
+        sbClient = window.supabase.createClient(sbConfig.url, sbConfig.key);
+      } catch (e) {
+        sbClient = null;
+      }
+    } else {
+      sbClient = null;
+    }
+  }
+
+  function rowsToLogs(rows) {
+    var out = {};
+    (rows || []).forEach(function (r) {
+      if (!out[r.subject_id]) out[r.subject_id] = {};
+      out[r.subject_id][r.log_date] = r.questions_done;
+    });
+    return out;
+  }
+
+  function logsToRows(logsObj) {
+    var rows = [];
+    Object.keys(logsObj).forEach(function (subjectId) {
+      var byDate = logsObj[subjectId] || {};
+      Object.keys(byDate).forEach(function (date) {
+        rows.push({ subject_id: subjectId, log_date: date, questions_done: byDate[date] });
+      });
+    });
+    return rows;
+  }
+
+  async function pullFromSupabase() {
+    if (!sbClient) return null;
+    try {
+      var res = await sbClient.from(TABLE).select("*");
+      if (res.error) throw res.error;
+      return rowsToLogs(res.data);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function pushCellToSupabase(subjectId, date, value) {
+    if (!sbClient) return;
+    try {
+      if (value === null) {
+        await sbClient.from(TABLE).delete().eq("subject_id", subjectId).eq("log_date", date);
+      } else {
+        await sbClient.from(TABLE).upsert(
+          { subject_id: subjectId, log_date: date, questions_done: value, updated_at: new Date().toISOString() },
+          { onConflict: "subject_id,log_date" }
+        );
+      }
+    } catch (e) {
+      setSaveStatus("error");
+    }
+  }
+
+  async function pushAllToSupabase(logsObj) {
+    if (!sbClient) return;
+    var rows = logsToRows(logsObj).map(function (r) {
+      r.updated_at = new Date().toISOString();
+      return r;
+    });
+    if (rows.length === 0) return;
+    try {
+      await sbClient.from(TABLE).upsert(rows, { onConflict: "subject_id,log_date" });
+    } catch (e) {}
+  }
+
+  function buildPlan(logsObj) {
+    var assumed = {};
+    SUBJECTS.forEach(function (s) { assumed[s.id] = 0; });
+    var table = {};
+    SUBJECTS.forEach(function (s) { table[s.id] = []; });
+    var activeIndex = 0;
+
+    DATES.forEach(function (d) {
+      var remainingBefore = {};
+      SUBJECTS.forEach(function (s) { remainingBefore[s.id] = Math.max(0, s.total - assumed[s.id]); });
+
+      var capacity = capacityFor(d);
+      var dayTargets = {};
+      SUBJECTS.forEach(function (s) { dayTargets[s.id] = 0; });
+
+      while (capacity > 0 && activeIndex < SUBJECTS.length) {
+        var s = SUBJECTS[activeIndex];
+        var remaining = Math.max(0, s.total - assumed[s.id]);
+        if (remaining <= 0) { activeIndex++; continue; }
+        var take = Math.min(remaining, capacity);
+        dayTargets[s.id] += take;
+        capacity -= take;
+
+        var subjLog = logsObj[s.id] || {};
+        var actualRaw = subjLog[d];
+        var actual = (actualRaw === undefined || actualRaw === null || actualRaw === "") ? null : Number(actualRaw);
+        var completion = actual !== null ? actual : take;
+        assumed[s.id] += completion;
+        if (assumed[s.id] >= s.total) activeIndex++;
+      }
+
+      SUBJECTS.forEach(function (s) {
+        var subjLog = logsObj[s.id] || {};
+        var actualRaw = subjLog[d];
+        var actual = (actualRaw === undefined || actualRaw === null || actualRaw === "") ? null : Number(actualRaw);
+        table[s.id].push({ date: d, target: dayTargets[s.id], actual: actual, done: remainingBefore[s.id] <= 0 });
+      });
+    });
+
+    return table;
+  }
+
+  function fmtHeaderCell(dateStr, showMonth) {
+    var d = new Date(dateStr + "T00:00:00");
+    var dayNum = d.getDate();
+    var weekday = WEEKDAY_ES[d.getDay()];
+    var isWeekend = d.getDay() === 0 || d.getDay() === 6;
+    var monthLabel = d.toLocaleDateString("es-ES", { month: "short" }).replace(".", "");
+    return (
+      '<div class="head-cell' + (isWeekend ? " weekend" : "") + '">' +
+        '<div class="head-month">' + (showMonth ? monthLabel : "") + "</div>" +
+        '<div class="head-day">' + dayNum + "</div>" +
+        '<div class="head-weekday">' + weekday + "</div>" +
+      "</div>"
+    );
+  }
+
+  function statusClass(cell) {
+    if (cell.done) return "done";
+    if (cell.actual === null) return "";
+    if (cell.actual < cell.target) return "behind";
+    if (cell.actual === cell.target) return "ontrack";
+    return "ahead";
+  }
+
+  function render() {
+    var plan = buildPlan(logs);
+
+    var todayTarget = 0, todayActual = 0;
+    SUBJECTS.forEach(function (s) {
+      var c = plan[s.id][0];
+      todayTarget += c.target;
+      todayActual += c.actual || 0;
+    });
+    var pending = SUBJECTS.reduce(function (acc, s) {
+      var done = Object.values(logs[s.id] || {}).reduce(function (a, b) { return a + Number(b || 0); }, 0);
+      return acc + Math.max(0, s.total - done);
+    }, 0);
+
+    var todayColor = (todayActual >= todayTarget && todayTarget > 0) ? "var(--green)" : (todayActual > 0 ? "var(--amber)" : "var(--muted)");
+
+    document.getElementById("summary").innerHTML =
+      '<div class="summary-cell"><div class="summary-label">Hoy</div><div class="summary-value" style="color:' + todayColor + '">' + todayActual + "/" + todayTarget + "</div></div>" +
+      '<div class="summary-cell"><div class="summary-label">Capacidad hoy</div><div class="summary-value" style="color:var(--blue)">' + capacityFor(TODAY) + "Q</div></div>" +
+      '<div class="summary-cell"><div class="summary-label">Pendientes</div><div class="summary-value">' + pending.toLocaleString("es-ES") + "</div></div>";
+
+    var html = "";
+    html += '<div class="corner" style="grid-column:1;grid-row:1;">ASIGNATURA</div>';
+    DATES.forEach(function (d, i) {
+      var showMonth = i === 0 || new Date(d + "T00:00:00").getDate() === 1;
+      html += fmtHeaderCell(d, showMonth);
+    });
+
+    SUBJECTS.forEach(function (s) {
+      html += '<div class="subject-cell"><div class="subject-code">' + s.code + '</div><div class="subject-name">' + s.name + "</div></div>";
+      plan[s.id].forEach(function (cell) {
+        if (cell.done) {
+          html += '<div class="cell done">✓</div>';
+        } else {
+          var cls = statusClass(cell);
+          var val = cell.actual === null ? "" : cell.actual;
+          var placeholder = cell.target > 0 ? cell.target : "–";
+          html +=
+            '<div class="cell ' + cls + '">' +
+              '<div class="cell-target">' + placeholder + "</div>" +
+              '<input type="number" min="0" inputmode="numeric" class="cell-input" data-subject="' + s.id + '" data-date="' + cell.date + '" value="' + val + '" placeholder="·" />' +
+            "</div>";
+        }
+      });
+    });
+
+    var grid = document.getElementById("tableGrid");
+    grid.style.gridTemplateColumns = "108px repeat(" + DATES.length + ", 42px)";
+    grid.innerHTML = html;
+  }
+
+  function setSaveStatus(state, extra) {
+    var dot = document.getElementById("saveDot");
+    var text = document.getElementById("saveText");
+    var colors = { ok: "var(--green)", saving: "var(--amber)", error: "var(--red)", idle: "var(--muted)", cloud: "var(--blue)" };
+    dot.style.background = colors[state] || colors.idle;
+    text.style.color = colors[state] || colors.idle;
+    if (state === "ok") text.textContent = "guardado local " + extra;
+    else if (state === "cloud") text.textContent = "sincronizado con Supabase " + extra;
+    else if (state === "saving") text.textContent = "guardando…";
+    else if (state === "error") text.textContent = "no se ha podido guardar";
+    else text.textContent = "sin cambios aún";
+  }
+
+  function nowTime() {
+    return new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  async function persistCell(subjectId, date, value) {
+    setSaveStatus("saving");
+    var okLocal = saveLocalLogs(logs);
+    if (sbClient) {
+      await pushCellToSupabase(subjectId, date, value);
+      setSaveStatus(okLocal ? "cloud" : "error", nowTime());
+    } else {
+      setSaveStatus(okLocal ? "ok" : "error", nowTime());
+    }
+  }
+
+  document.getElementById("tableGrid").addEventListener("change", function (e) {
+    var target = e.target;
+    if (!target.classList.contains("cell-input")) return;
+    var subjectId = target.dataset.subject;
+    var date = target.dataset.date;
+    var valueStr = target.value;
+    var value = null;
+
+    if (!logs[subjectId]) logs[subjectId] = {};
+    if (valueStr === "") {
+      delete logs[subjectId][date];
+      value = null;
+    } else {
+      var n = parseInt(valueStr, 10);
+      value = isNaN(n) ? 0 : Math.max(0, n);
+      logs[subjectId][date] = value;
+    }
+    persistCell(subjectId, date, value);
+    render();
+  });
+
+  document.getElementById("tableGrid").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && e.target.classList.contains("cell-input")) e.target.blur();
+  });
+
+  // Config panel wiring
+  var gearBtn = document.getElementById("gearBtn");
+  var configPanel = document.getElementById("configPanel");
+  var cfgUrl = document.getElementById("cfgUrl");
+  var cfgKey = document.getElementById("cfgKey");
+  var cfgStatus = document.getElementById("cfgStatus");
+
+  if (sbConfig) {
+    cfgUrl.value = sbConfig.url || "";
+    cfgKey.value = sbConfig.key || "";
+  }
+
+  gearBtn.addEventListener("click", function () {
+    configPanel.classList.toggle("open");
+  });
+
+  document.getElementById("cfgSave").addEventListener("click", async function () {
+    var url = cfgUrl.value.trim();
+    var key = cfgKey.value.trim();
+    if (!url || !key) {
+      cfgStatus.style.color = "var(--red)";
+      cfgStatus.textContent = "rellena URL y clave";
+      return;
+    }
+    sbConfig = { url: url, key: key };
+    saveSupabaseConfig(sbConfig);
+    initSupabaseClient();
+    if (!sbClient) {
+      cfgStatus.style.color = "var(--red)";
+      cfgStatus.textContent = "no se pudo conectar";
+      return;
+    }
+    cfgStatus.style.color = "var(--amber)";
+    cfgStatus.textContent = "conectando…";
+    var cloudLogs = await pullFromSupabase();
+    if (cloudLogs === null) {
+      cfgStatus.style.color = "var(--red)";
+      cfgStatus.textContent = "conexión fallida — revisa URL/clave y que ejecutaste el SQL";
+      sbClient = null;
+      return;
+    }
+    // La nube manda si ya tiene datos; si está vacía, sube lo que tengas en local.
+    if (Object.keys(cloudLogs).length > 0) {
+      logs = cloudLogs;
+      saveLocalLogs(logs);
+    } else {
+      await pushAllToSupabase(logs);
+    }
+    cfgStatus.style.color = "var(--green)";
+    cfgStatus.textContent = "conectado y sincronizado ✓";
+    setSaveStatus("cloud", nowTime());
+    render();
+  });
+
+  document.getElementById("cfgClear").addEventListener("click", function () {
+    clearSupabaseConfig();
+    sbConfig = null;
+    sbClient = null;
+    cfgUrl.value = "";
+    cfgKey.value = "";
+    cfgStatus.style.color = "var(--muted)";
+    cfgStatus.textContent = "desconectado — solo guardado local";
+    setSaveStatus("ok", nowTime());
+  });
+
+  // Arranque
+  async function boot() {
+    initSupabaseClient();
+    render();
+    if (sbClient) {
+      var cloudLogs = await pullFromSupabase();
+      if (cloudLogs !== null) {
+        logs = cloudLogs;
+        saveLocalLogs(logs);
+        render();
+        setSaveStatus("cloud", nowTime());
+        return;
+      }
+    }
+    var hasData = Object.keys(logs).length > 0;
+    setSaveStatus(hasData ? "ok" : "idle", nowTime());
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
