@@ -264,6 +264,7 @@
   .cell.ontrack { background: var(--green-soft); }
   .cell.ahead { background: var(--blue-soft); }
   .cell.done { background: var(--green-soft); color: var(--green); font-size: 13px; }
+  .cell.paused { background: var(--panel2); color: var(--muted-dim); font-size: 12px; }
 
   .cell-target { font-size: 8px; color: var(--muted-dim); font-family: 'IBM Plex Mono', monospace; height: 10px; }
   .cell-input {
@@ -346,7 +347,7 @@
     </div>
 
     <div class="footer-note">
-      cada día haces 300Q (hasta el 31/8) o 200Q (desde el 1/9) enteras en UNA asignatura a la vez, por este orden: Meteo → POF → FPL → Air Law → Performance.
+      hoy haces 200Q, del 18 al 31/8 haces 300Q/día, y desde el 1/9 vuelves a 200Q/día — siempre enteras en UNA asignatura a la vez, por este orden: Meteo → POF → FPL → Air Law → Performance.
       en cuanto terminas una, la siguiente empieza a recibir la capacidad del día. lo que no cumplas hoy se suma a los días siguientes de esa misma asignatura.<br /><br />
       se guarda siempre en este navegador (localStorage), y si conectas Supabase (⚙ arriba), además se sincroniza en la nube — así lo tienes accesible desde cualquier dispositivo y a salvo aunque borres el navegador.
     </div>
@@ -357,19 +358,24 @@
   "use strict";
 
   var SUBJECTS = [
-    { id: "met", code: "MET", name: "Meteorology", examDate: "2026-10-19", total: 3000 },
-    { id: "pof", code: "POF", name: "Principles of Flight", examDate: "2026-10-23", total: 2900 },
-    { id: "fpl", code: "FPL", name: "Flight Planning", examDate: "2026-10-26", total: 1700 },
-    { id: "law", code: "LAW", name: "Air Law", examDate: "2026-10-28", total: 2000 },
+    { id: "met", code: "MET", name: "Meteorology", examDate: "2026-10-19", total: 1533 },
+    { id: "pof", code: "POF", name: "Principles of Flight", examDate: "2026-10-23", total: 1347 },
+    { id: "fpl", code: "FPL", name: "Flight Planning", examDate: "2026-10-26", total: 1528 },
+    { id: "law", code: "LAW", name: "Air Law", examDate: "2026-10-28", total: 1900 },
     { id: "per", code: "PER", name: "Performance", examDate: "2026-10-30", total: 1600 }
   ];
-  var LAST_DATE = "2026-10-19";
-  var STORAGE_KEY = "atpl-planner-logs-v1";
+  var START_DATE = "2026-08-17"; // primer día: cuota reducida a 200Q
+  var LAST_DATE = "2026-09-18"; // fecha en la que terminas todo con este ritmo
+  var STORAGE_KEY = "atpl-planner-logs-v3";
   var CONFIG_KEY = "atpl-supabase-config";
   var TABLE = "atpl_planner_logs";
   var WEEKDAY_ES = ["D", "L", "M", "X", "J", "V", "S"];
 
-  function capacityFor(dateStr) { return dateStr >= "2026-09-01" ? 200 : 300; }
+  function capacityFor(dateStr) {
+    if (dateStr === START_DATE) return 200;
+    if (dateStr >= "2026-09-01") return 200;
+    return 300;
+  }
 
   function toLocalISODate(d) {
     var y = d.getFullYear();
@@ -536,7 +542,13 @@
         var subjLog = logsObj[s.id] || {};
         var actualRaw = subjLog[d];
         var actual = (actualRaw === undefined || actualRaw === null || actualRaw === "") ? null : Number(actualRaw);
-        table[s.id].push({ date: d, target: dayTargets[s.id], actual: actual, done: remainingBefore[s.id] <= 0 });
+        table[s.id].push({
+          date: d,
+          target: dayTargets[s.id],
+          actual: actual,
+          done: remainingBefore[s.id] <= 0,
+          paused: false
+        });
       });
     });
 
@@ -599,6 +611,8 @@
       plan[s.id].forEach(function (cell) {
         if (cell.done) {
           html += '<div class="cell done">✓</div>';
+        } else if (cell.paused) {
+          html += '<div class="cell paused" title="1\u00aa mitad hecha, esperando su turno">⏸</div>';
         } else {
           var cls = statusClass(cell);
           var val = cell.actual === null ? "" : cell.actual;
