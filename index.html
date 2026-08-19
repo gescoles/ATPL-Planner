@@ -410,12 +410,8 @@
 
   function loadOrInitPlanStart() {
     var FORCED_START = "2026-08-18"; // el día real en que empezaste a estudiar
-    var stored = null;
-    try { stored = localStorage.getItem(PLAN_START_KEY); } catch (e) {}
-    var result = stored || TODAY;
-    if (FORCED_START < result) result = FORCED_START;
-    try { localStorage.setItem(PLAN_START_KEY, result); } catch (e) {}
-    return result;
+    try { localStorage.setItem(PLAN_START_KEY, FORCED_START); } catch (e) {}
+    return FORCED_START;
   }
 
   function earliestLogDate(logsObj) {
@@ -777,11 +773,6 @@
   // Arranque
   async function boot() {
     PLAN_START = loadOrInitPlanStart();
-    var earliestLocal = earliestLogDate(logs);
-    if (earliestLocal && earliestLocal < PLAN_START) {
-      PLAN_START = earliestLocal;
-      try { localStorage.setItem(PLAN_START_KEY, PLAN_START); } catch (e) {}
-    }
     DATES = dateRange(PLAN_START, LAST_DATE);
 
     initSupabaseClient();
@@ -790,12 +781,6 @@
       var cloudLogs = await pullFromSupabase();
       if (cloudLogs !== null) {
         logs = cloudLogs;
-        var earliestCloud = earliestLogDate(logs);
-        if (earliestCloud && earliestCloud < PLAN_START) {
-          PLAN_START = earliestCloud;
-          try { localStorage.setItem(PLAN_START_KEY, PLAN_START); } catch (e) {}
-          DATES = dateRange(PLAN_START, LAST_DATE);
-        }
         saveLocalLogs(logs);
         render();
         setSaveStatus("cloud", nowTime());
