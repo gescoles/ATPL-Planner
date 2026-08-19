@@ -348,8 +348,8 @@
     </div>
 
     <div class="footer-note">
-      hoy haces 200Q, del 18 al 31/8 haces 300Q/día, y desde el 1/9 vuelves a 200Q/día — siempre enteras en UNA asignatura a la vez, por este orden: Meteo → POF → FPL → Air Law → Performance.
-      en cuanto terminas una, la siguiente empieza a recibir la capacidad del día. lo que no cumplas hoy se suma a los días siguientes de esa misma asignatura.<br /><br />
+      250Q/día hasta el 31/8, 200Q/día desde el 1/9 — siempre enteras en UNA asignatura a la vez, por este orden: Meteo → POF → FPL → Air Law → Performance.
+      en cuanto terminas una, la siguiente empieza a recibir la capacidad del día. lo que no cumplas un día se suma a los días siguientes de esa misma asignatura (y si haces de más, se descuenta también).<br /><br />
       se guarda siempre en este navegador (localStorage), y si conectas Supabase (⚙ arriba), además se sincroniza en la nube — así lo tienes accesible desde cualquier dispositivo y a salvo aunque borres el navegador.
     </div>
   </div>
@@ -365,16 +365,14 @@
     { id: "law", code: "LAW", name: "Air Law", examDate: "2026-10-28", total: 1900 },
     { id: "per", code: "PER", name: "Performance", examDate: "2026-10-30", total: 1600 }
   ];
-  var LAST_DATE = "2026-09-18"; // fecha en la que terminas todo con este ritmo
+  var LAST_DATE = "2026-09-23"; // fecha en la que terminas todo con este ritmo
   var STORAGE_KEY = "atpl-planner-logs-v3";
   var CONFIG_KEY = "atpl-supabase-config";
   var TABLE = "atpl_planner_logs";
   var WEEKDAY_ES = ["D", "L", "M", "X", "J", "V", "S"];
 
   function capacityFor(dateStr) {
-    if (dateStr === PLAN_START) return 200;
-    if (dateStr >= "2026-09-01") return 200;
-    return 300;
+    return dateStr >= "2026-09-01" ? 200 : 250;
   }
 
   function toLocalISODate(d) {
@@ -411,12 +409,13 @@
   var DATES = []; // se rellena en boot() una vez sabemos PLAN_START
 
   function loadOrInitPlanStart() {
+    var FORCED_START = "2026-08-18"; // el día real en que empezaste a estudiar
     var stored = null;
     try { stored = localStorage.getItem(PLAN_START_KEY); } catch (e) {}
-    if (stored) return stored;
-    // Primera vez que se abre esta versión: fija hoy como inicio para siempre.
-    try { localStorage.setItem(PLAN_START_KEY, TODAY); } catch (e) {}
-    return TODAY;
+    var result = stored || TODAY;
+    if (FORCED_START < result) result = FORCED_START;
+    try { localStorage.setItem(PLAN_START_KEY, result); } catch (e) {}
+    return result;
   }
 
   function earliestLogDate(logsObj) {
